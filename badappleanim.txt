@@ -1,15 +1,11 @@
--- require'lfs'
-
 -- Define the hardware interfaces we'll use
 cpu = manager:machine().devices[":maincpu"];
 mem = cpu.spaces["program"];
 game = emu.romname("pacman");
-last_write_time = -10
 
--- TODO: Create another textfile to include num of frames in vid2pix
+
 frame_ct = 0
-frame_a = 0
-num_frames = 6571 
+num_frames = 6570
 frames_path = "frames/"
 
 
@@ -67,7 +63,6 @@ end
 function render_frame(frame_arr)
     
 	pix_address = 0x47DD
-    --print( "BEFOER: " .. string.format("%x", pix_address) )
     arr_i = 0
 	
 	x_offset = 0x0001
@@ -98,7 +93,6 @@ function render_frame(frame_arr)
    
 			
 		end
---        print("END")
 	end
 	
 	
@@ -143,7 +137,7 @@ function add_b_or_w_vals(arr_val,pix_address)
         --print("BLACK")
         replace_tile(pix_address, bcolor_val, clr_sprite_val)	
 
-    elseif tonumber(arr_val) == 225 then
+    elseif tonumber(arr_val) == 255 then
         --print("WHITE")
         replace_tile(pix_address, wcolor_val, sprite_val)
     end
@@ -156,15 +150,8 @@ function animate_frames()
     print("framect: " .. frame_ct)
     print("-----------------------")
 
-	if (mem:read_i8(0x4E00) == 0x02) 
-    --if (mem:read_i32(0x5000) == coin_insert_val)
-        and
-		(frame_ct <= num_frames)	 
+	if (mem:read_i8(0x4E00) == 0x02) and (frame_ct <= num_frames)	 
 	then
-
---		print("Coin insert")
-		--print(mem:read_i8(0x4E6E))
-       
     
         if frame_ct % 1 == 0 then 
             f = math.floor(frame_ct)
@@ -174,16 +161,15 @@ function animate_frames()
             
         end
         
-        frame_ct = frame_ct + 0.5
+        --can change counter to slow it down
+        --frame_ct = frame_ct + 0.5
+        frame_ct = frame_ct + 1
 
 	end
 
-    --frame_ct = frame_ct + 1
+
 
 end
-
---print(string.format("%x", 0x440F + 0x0001)) --print in 0x0000 format
-
 
 emu.register_frame(animate_frames,"frame")
 
