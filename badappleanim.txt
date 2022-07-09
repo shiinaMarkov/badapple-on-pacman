@@ -1,0 +1,191 @@
+-- require'lfs'
+
+-- Define the hardware interfaces we'll use
+cpu = manager:machine().devices[":maincpu"];
+mem = cpu.spaces["program"];
+game = emu.romname("pacman");
+last_write_time = -10
+
+-- TODO: Create another textfile to include num of frames in vid2pix
+frame_ct = 0
+frame_a = 0
+num_frames = 6571 
+frames_path = "frames/"
+
+
+-- PACMAN Specific values
+tile_w = 28
+tile_h = 36
+
+sprite_val = 0xB0
+clr_sprite_val = 0x40
+
+wcolor_val = 0x0F
+bcolor_val = 0x00
+coin_insert_val = 0xffffffffdfdfdfdf
+
+-- read in file
+function read_file(filename)
+    print(filename)
+    local file = io.open(filename, "r" )
+    local contents = file:read( "*all" )
+    -- print(type(contents)) --returns string
+    file:close()
+    return contents
+end
+
+-- uses text file to tokenize and create an array of color values
+function create_frame_arr(frame_ct)
+	framename = "frame" .. tostring(frame_ct)
+	filename = framename .. ".txt"
+	filepath = frames_path .. filename
+	content = read_file(filepath)
+	frame_arr = split_string(content, " ")
+	
+	return frame_arr
+	--print(#split_string)
+	
+end
+
+-- split string based on whitespace
+function split_string(s)
+    result = {}
+    for match in string.gmatch(s,"[^%s]+") do
+    	table.insert(result, match)
+    end
+    return result
+end
+
+-- replace pixel color and palette
+function replace_tile(pix_add,color_add, sprite_add)
+    mem:write_i16(pix_add,color_add) --change color palette
+    mem:write_i16(pix_add-0x0400,sprite_add) --change sprite palette
+end
+
+
+-- check where address is and place pixels in certain areas
+function render_frame(frame_arr)
+    
+	pix_address = 0x47DD
+    --print( "BEFOER: " .. string.format("%x", pix_address) )
+    arr_i = 0
+	
+	x_offset = 0x0001
+	y_offset = 0x003B
+	
+
+	for i = 0, tile_h-1, 1 
+	do
+
+		for j = 0, tile_w-1, 1 
+		do
+
+            if arr_i < #(frame_arr) then
+
+                add_b_or_w_vals(frame_arr[arr_i], pix_address)
+
+			    
+			    if j == 27 then
+                    pix_address = add_y_offset(i,y_offset,pix_address)
+                else
+                
+                    pix_address = add_x_offset(i,x_offset,pix_address)
+                end
+                
+                arr_i = arr_i + 1
+
+            end
+   
+			
+		end
+--        print("END")
+	end
+	
+	
+end
+
+function add_x_offset(i,x_offset,pix_address)
+    if (i <= 1 or i >= 34) then
+        x_offset = 0x0001
+        pix_address = pix_address - x_offset
+
+    elseif (i >= 2 or i >= 33) then 
+        x_offset = 0x0020
+        pix_address = pix_address - x_offset
+    end
+
+    return pix_address
+end
+
+
+
+function add_y_offset(i,y_offset,pix_address)
+
+    if (i == 0 or i == 34) then
+        y_offset = 0x003B
+        pix_address =  y_offset + pix_address
+
+    elseif (i == 1 or i == 33) then 
+        y_offset = 0x0042
+        pix_address = -y_offset + pix_address
+
+    elseif (i >= 2 or i <= 32) then 
+        y_offset = 0x0361
+        pix_address = pix_address + y_offset
+    end
+    
+    return pix_address
+
+end
+
+function add_b_or_w_vals(arr_val,pix_address)
+    if tonumber(arr_val) == 0 then
+        --print("BLACK")
+        replace_tile(pix_address, bcolor_val, clr_sprite_val)	
+
+    elseif tonumber(arr_val) == 225 then
+        --print("WHITE")
+        replace_tile(pix_address, wcolor_val, sprite_val)
+    end
+end
+
+
+
+function animate_frames()
+    
+    print("framect: " .. frame_ct)
+    print("-----------------------")
+
+	if (mem:read_i8(0x4E00) == 0x02) 
+    --if (mem:read_i32(0x5000) == coin_insert_val)
+        and
+		(frame_ct <= num_frames)	 
+	then
+
+--		print("Coin insert")
+		--print(mem:read_i8(0x4E6E))
+       
+    
+        if frame_ct % 1 == 0 then 
+            f = math.floor(frame_ct)
+		    frame_arr = create_frame_arr(f)
+		    render_frame(frame_arr)
+		    
+            
+        end
+        
+        frame_ct = frame_ct + 0.5
+
+	end
+
+    --frame_ct = frame_ct + 1
+
+end
+
+--print(string.format("%x", 0x440F + 0x0001)) --print in 0x0000 format
+
+
+emu.register_frame(animate_frames,"frame")
+
+
+
